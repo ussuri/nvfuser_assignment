@@ -1,24 +1,32 @@
 #include "device_tensor.cuh"
 
-template<int N_DIMS>
-void device_tensor<N_DIMS>::fill_random(){
+template <int N_DIMS>
+void device_tensor<N_DIMS>::fill_random() {
   host_tensor<N_DIMS> rand_vals(this->size, true);
   this->copy(rand_vals);
 }
 
-template<int N_DIMS>
-void device_tensor<N_DIMS>::copy(const device_tensor<N_DIMS>& other){
+template <int N_DIMS>
+void device_tensor<N_DIMS>::copy(const device_tensor<N_DIMS>& other) {
   assert(this->get_n_elems() == other.get_n_elems());
-  CHECK(cudaMemcpy(this->get(), other.get(), this->get_n_elems()*sizeof(float), cudaMemcpyDeviceToDevice));
+  CHECK(cudaMemcpy(
+      this->get(),
+      other.get(),
+      this->get_n_elems() * sizeof(float),
+      cudaMemcpyDeviceToDevice));
 };
 
-template<int N_DIMS>
-void device_tensor<N_DIMS>::copy(const host_tensor<N_DIMS>& other){
+template <int N_DIMS>
+void device_tensor<N_DIMS>::copy(const host_tensor<N_DIMS>& other) {
   assert(this->get_n_elems() == other.get_n_elems());
-  CHECK(cudaMemcpy(this->get(), other.get(), this->get_n_elems()*sizeof(float), cudaMemcpyHostToDevice));
+  CHECK(cudaMemcpy(
+      this->get(),
+      other.get(),
+      this->get_n_elems() * sizeof(float),
+      cudaMemcpyHostToDevice));
 };
 
-//Instantiate
+// Instantiate
 template class device_tensor<1>;
 template class device_tensor<2>;
 template class device_tensor<3>;
