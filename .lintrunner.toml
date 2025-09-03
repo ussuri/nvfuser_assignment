@@ -1,0 +1,371 @@
+[[linter]]
+code = 'FLAKE8'
+include_patterns = ['**/*.py']
+exclude_patterns = [
+    '.git/**',
+    'third_party/**',
+    'tools/examples/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/flake8_linter.py',
+    '--',
+    '@{{PATHSFILE}}'
+]
+init_command = [
+    'python3',
+    'tools/linter/adapters/pip_init.py',
+    '--dry-run={{DRYRUN}}',
+    'flake8==6.1.0',
+]
+
+
+[[linter]]
+code = 'CLANGFORMAT'
+include_patterns = [
+    '**/*.h',
+    '**/*.cpp',
+    '**/*.cu',
+    '**/*.inl',
+]
+exclude_patterns = [
+    'third_party/**',
+    '**/*generated*',
+    'tools/examples/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/clangformat_linter.py',
+    '--binary=~/.local/bin/clang-format',
+    '--',
+    '@{{PATHSFILE}}'
+]
+init_command = [
+    'python3',
+    'tools/linter/adapters/pip_init.py',
+    '--dry-run={{DRYRUN}}',
+    'clang-format==19.1.7',
+]
+is_formatter = true
+
+[[linter]]
+code = 'TORCH_INTERNAL_ASSERT'
+include_patterns = [
+    '**/*.h',
+    '**/*.cpp',
+    '**/*.cu',
+    '**/*.inl',
+]
+exclude_patterns = [
+    'pytorch/**/*.cpp',
+    'third_party/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/grep_linter.py',
+    '--pattern=TORCH_INTERNAL_ASSERT',
+    '--linter-name=TORCH_INTERNAL_ASSERT',
+    '--error-name=calling TORCH_INTERNAL_ASSERT, use NVF_ERROR instead',
+    '--replace-pattern=s/TORCH_INTERNAL_ASSERT/NVF_ERROR/',
+    """--error-description=\
+        using TORCH_INTERNAL_ASSERT in nvfuser code base is deprecated, \
+        use NVF_ERROR instead\
+    """,
+    '--',
+    '@{{PATHSFILE}}'
+]
+is_formatter = true
+
+[[linter]]
+code = 'TORCH_CHECK'
+include_patterns = [
+    '**/*.h',
+    '**/*.cpp',
+    '**/*.cu',
+    '**/*.inl',
+]
+exclude_patterns = [
+    'pytorch/**/*.cpp',
+    'third_party/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/grep_linter.py',
+    '--pattern=TORCH_CHECK',
+    '--linter-name=TORCH_CHECK',
+    '--error-name=calling TORCH_CHECK, use NVF_CHECK instead',
+    '--replace-pattern=s/TORCH_CHECK/NVF_CHECK/',
+    """--error-description=\
+        using TORCH_CHECK in nvfuser code base is deprecated, \
+        use NVF_CHECK instead\
+    """,
+    '--',
+    '@{{PATHSFILE}}'
+]
+is_formatter = true
+
+[[linter]]
+code = 'C10_ERROR'
+include_patterns = [
+    '**/*.h',
+    '**/*.cpp',
+    '**/*.cu',
+    '**/*.inl',
+]
+exclude_patterns = [
+    'pytorch/**/*.cpp',
+    'third_party/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/grep_linter.py',
+    '--pattern=c10::Error',
+    '--linter-name=C10_ERROR',
+    '--error-name=using c10::Error',
+    '--replace-pattern=s/c10::Error/nvfuser::nvfError/',
+    """--error-description=\
+        using c10::Error in nvfuser code base is deprecated, \
+        use nvfuser::nvfError instead\
+    """,
+    '--',
+    '@{{PATHSFILE}}'
+]
+is_formatter = true
+
+[[linter]]
+code = 'TORCH_CUDA_CU_API'
+include_patterns = [
+    '**/*.h',
+    '**/*.cpp',
+    '**/*.cu',
+    '**/*.inl',
+]
+exclude_patterns = [
+    'pytorch/**/*.cpp',
+    'third_party/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/grep_linter.py',
+    '--pattern=TORCH_CUDA_CU_API',
+    '--linter-name=TORCH_CUDA_CU_API',
+    '--error-name=using TORCH_CUDA_CU_API',
+    '--replace-pattern=s/TORCH_CUDA_CU_API//',
+    """--error-description=\
+        using TORCH_CUDA_CU_API in nvfuser code base is deprecated
+    """,
+    '--',
+    '@{{PATHSFILE}}'
+]
+is_formatter = true
+
+
+[[linter]]
+code = 'CLANGTIDY'
+include_patterns = [
+    '**/*.h',
+    '**/*.cpp',
+    '**/*.cu',
+    '**/*.inl',
+]
+exclude_patterns = [
+    'csrc/serde/fusion_cache_generated.h',
+    'pytorch/**/*.cpp',
+    'third_party/**',
+    'tools/examples/**',
+]
+
+init_command = [
+    'python3',
+    'tools/linter/adapters/pip_init.py',
+    '--dry-run={{DRYRUN}}',
+    'clang-tidy==19.1.0.1',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/clangtidy_linter.py',
+    '--binary=~/.local/bin/clang-tidy',
+    '--build_dir=./python/build',
+    '--',
+    '@{{PATHSFILE}}'
+]
+
+[[linter]]
+code = 'MYPY'
+include_patterns = [
+    '**/*.py',
+    '**/*.pyi',
+    'third_party/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/mypy_linter.py',
+    '--config=mypy.ini',
+    '--',
+    '@{{PATHSFILE}}'
+]
+init_command = [
+    'python3',
+    'tools/linter/adapters/pip_init.py',
+    '--dry-run={{DRYRUN}}',
+    'mypy==1.4.0',
+]
+
+[[linter]]
+code = 'MYPYSTRICT'
+include_patterns = [
+    '**/*.py',
+]
+exclude_patterns = [
+    'third_party/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/mypy_linter.py',
+    '--config=mypy-strict.ini',
+    '--',
+    '@{{PATHSFILE}}'
+]
+
+[[linter]]
+code = 'TYPEIGNORE'
+include_patterns = ['**/*.py', '**/*.pyi']
+exclude_patterns = [
+    'third_party/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/grep_linter.py',
+    '--pattern=# type:\s*ignore([^\[]|$)',
+    '--linter-name=TYPEIGNORE',
+    '--error-name=unqualified type: ignore',
+    """--error-description=\
+        This line has an unqualified `type: ignore`; \
+        please convert it to `type: ignore[xxxx]`\
+    """,
+    '--',
+    '@{{PATHSFILE}}'
+]
+
+[[linter]]
+code = 'NOQA'
+include_patterns = ['**/*.py', '**/*.pyi']
+exclude_patterns = [
+    'third_party/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/grep_linter.py',
+    '--pattern=# noqa([^:]|$)',
+    '--linter-name=NOQA',
+    '--error-name=unqualified noqa',
+    """--error-description=\
+        This line has an unqualified `noqa`; \
+        please convert it to `noqa: XXXX`\
+    """,
+    '--',
+    '@{{PATHSFILE}}'
+]
+
+
+[[linter]]
+code = 'NEWLINE'
+include_patterns=['**']
+exclude_patterns = [
+    'third_party/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/newlines_linter.py',
+    '--',
+    '@{{PATHSFILE}}',
+]
+is_formatter = true
+
+[[linter]]
+code = 'SPACES'
+include_patterns = ['**']
+exclude_patterns = [
+    'third_party/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/grep_linter.py',
+    '--pattern=[[:blank:]]$',
+    '--linter-name=SPACES',
+    '--error-name=trailing spaces',
+    '--replace-pattern=s/[[:blank:]]+$//',
+    """--error-description=\
+        This line has trailing spaces; please remove them.\
+    """,
+    '--',
+    '@{{PATHSFILE}}'
+]
+
+[[linter]]
+code = 'TABS'
+include_patterns = ['**']
+exclude_patterns = [
+    '**/*Makefile',
+    '**/.gitattributes',
+    '**/.gitmodules',
+    '.lintrunner.toml',
+    'CMakeLists.txt',
+    'third_party/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/grep_linter.py',
+    '--pattern=	',
+    '--linter-name=TABS',
+    '--error-name=saw some tabs',
+    '--replace-pattern=s/\t/    /',
+    """--error-description=\
+        This line has tabs; please replace them with spaces.\
+    """,
+    '--',
+    '@{{PATHSFILE}}'
+]
+
+[[linter]]
+code = 'EXEC'
+include_patterns = ['**']
+exclude_patterns = [
+    '**/*.so',
+    '**/*.py',
+    '**/*.sh',
+    '**/*.bash',
+    '**/git-pre-commit',
+    '**/git-clang-format',
+    'third_party/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/exec_linter.py',
+    '--',
+    '@{{PATHSFILE}}',
+]
+
+[[linter]]
+code = 'BLACK'
+include_patterns = [
+    '**/*.py',
+]
+exclude_patterns = [
+    'third_party/**',
+    'tools/examples/**',
+]
+command = [
+    'python3',
+    'tools/linter/adapters/black_linter.py',
+    '--',
+    '@{{PATHSFILE}}'
+]
+init_command = [
+    'python3',
+    'tools/linter/adapters/pip_init.py',
+    '--dry-run={{DRYRUN}}',
+    '--no-binary',
+    'black==23.3.0',
+]
+is_formatter = true
