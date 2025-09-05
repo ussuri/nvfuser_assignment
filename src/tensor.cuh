@@ -29,13 +29,14 @@ template <int N_DIMS>
 class tensor {
  protected:
   // Total number of elements the tensor holds
-  size_t n_elems;
+  size_t n_elems = 0;
 
   // Set the above value based on size array
   void set_n_elems() {
     n_elems = 1;
-    for (int i = 0; i < N_DIMS; i++)
+    for (int i = 0; i < N_DIMS; i++) {
       n_elems *= size[i];
+    }
   }
 
   // Shared pointer for the allocation. only used to keep track of references to
@@ -45,7 +46,7 @@ class tensor {
 
   // Allocation of the data for instances of this class, could point to GPU or
   // CPU data.
-  float* allocation;
+  float* allocation = nullptr;
 
   // Derived classes must define how to allocate their own data.
   virtual void alloc_data() = 0;
@@ -53,7 +54,7 @@ class tensor {
   // Get the allocation pointer.
   __host__ __device__ float* get() const {
     return allocation;
-  };
+  }
 
  public:
   // Return the number of elements this tensor holds.
@@ -129,5 +130,7 @@ class tensor {
     static_assert(
         N_DIMS >= 1, "Tensor class must be at least 1 dimensional.\n");
     set_n_elems();
+    // TODO(ussuri): `rand` is ignored, and `fill_random()` can't be easily used
+    // here anyway (virtual resolution is off).
   }
 };

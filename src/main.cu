@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <cuda.h>
+#include <cmath>
 #include <iostream>
 
 #include "device_patterns.cuh"
@@ -96,9 +97,10 @@ float check_result(
 }
 
 // Size to run
-#define M 1024 * 4
-#define N 1024
-#define ITERATIONS 8
+constexpr uint32_t M = 1024 * 4;
+constexpr uint32_t N = 1024;
+constexpr uint32_t ITERATIONS = 8;
+
 int main(void) {
   /*
      Do not change this section of code, this is how the user expects to

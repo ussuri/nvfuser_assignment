@@ -1,5 +1,7 @@
 // Simple math operations to be used with device_patterns.cuh
 
+// TODO(ussuri): Why are floats passed by reference here? 
+
 struct square_op {
   __host__ __device__ static inline float op(const float& a) {
     return a * a;

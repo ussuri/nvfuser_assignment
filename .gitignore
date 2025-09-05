@@ -1,9 +1,13 @@
 # binary reference
 bin
+obj
 
 # cmake build directory
 build
 .lintbin
+
+# VS
+.vs
 
 nvfuser_common/version.py
 nvfuser_common/include
@@ -49,6 +53,8 @@ python/nvfuser_direct/*.so
 *~
 .~lock.*
 .vscode
+*.pdb
+MODULE.bazel.lock
 
 # debugging temporaries
 *.log
