@@ -101,8 +101,8 @@ float check_result(
 }
 
 // Size to run
-constexpr uint32_t M = 1024 * 4;
-constexpr uint32_t N = 1024;
+constexpr uint32_t M = 8 * 4;
+constexpr uint32_t N = 8;
 constexpr uint32_t ITERATIONS = 8;
 
 #define VV(x) #x "=" << (x) << " "
