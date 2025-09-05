@@ -12,6 +12,7 @@ It is unlikely you need to modify this file, but for the brave...
 #include <array>
 #include <cassert>
 #include <memory>
+#include <ostream>
 
 #include "utils.cuh"
 
@@ -132,5 +133,18 @@ class tensor {
     set_n_elems();
     // TODO(ussuri): `rand` is ignored, and `fill_random()` can't be easily used
     // here anyway (virtual resolution is off).
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, const tensor<N_DIMS>& t) {
+    os << "tensor<";
+    for (int i = 0; i < N_DIMS; ++i) {
+      os << t.size[i] << (i < N_DIMS - 1 ? "" : ",");
+    }
+    os << ">{";
+    for (int i = 0; i < t.get_n_elems(); ++i) {
+      os << t.at_linear(i) << (i < t.get_n_elems() - 1 ? ", " : "");
+    }
+    os << "}";
+    return os;
   }
 };

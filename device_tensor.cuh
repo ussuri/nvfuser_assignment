@@ -10,6 +10,7 @@ It is unlikely you need to modify this file, but for the brave...
 */
 
 #pragma once
+
 #include <cuda_device_runtime_api.h>
 #include "host_tensor.cuh"
 #include "tensor.cuh"

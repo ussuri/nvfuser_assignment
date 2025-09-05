@@ -11,6 +11,7 @@ DO NOT modify code in this file.
 */
 
 #pragma once
+
 #include "device_tensor.cuh"
 #include "tensor.cuh"
 
@@ -70,7 +71,3 @@ class host_tensor : public tensor<N_DIMS> {
   virtual void fill_random();
   void fill(float val);
 };
-
-// Utility functions
-void print(host_tensor<2> in);
-void print(host_tensor<1> in);
