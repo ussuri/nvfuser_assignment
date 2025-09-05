@@ -138,7 +138,7 @@ class tensor {
   friend std::ostream& operator<<(std::ostream& os, const tensor<N_DIMS>& t) {
     os << "tensor<";
     for (int i = 0; i < N_DIMS; ++i) {
-      os << t.size[i] << (i < N_DIMS - 1 ? "" : ",");
+      os << t.size[i] << ((i < N_DIMS - 1) ? "," : "");
     }
     os << ">{";
     for (int i = 0; i < t.get_n_elems(); ++i) {

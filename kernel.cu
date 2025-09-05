@@ -141,12 +141,15 @@ int main() {
 
   // Print the amount of time required by the gpu implementation.
   std::cout << "Finished in " << ms << " ms." << std::endl;
+  if constexpr (false) {
+    const host_tensor<2> dOutCopy = dOut;
+    std::cout << VV(hOut) << std::endl << VV(dOutCopy) << std::endl;
+  }
 
   // Make sure the result of your implementation is correct.
   const auto maxDiff = check_result(hOut, dOut);
   std::cout << VV(maxDiff);
   if (maxDiff > 1e-4) {
-    std::cout << VV(hOut) << std::endl << VV(dOut) << std::endl;
     return EXIT_FAILURE;
   }
 
