@@ -101,8 +101,8 @@ float check_result(
 }
 
 // Size to run
-constexpr uint32_t M = 1024 * 4;
-constexpr uint32_t N = 1024;
+constexpr uint32_t M = 8 * 4;
+constexpr uint32_t N = 8;
 constexpr uint32_t ITERATIONS = 8;
 
 #define VV(x) #x "=" << (x) << " "
@@ -141,12 +141,13 @@ int main() {
 
   // Print the amount of time required by the gpu implementation.
   std::cout << "Finished in " << ms << " ms." << std::endl;
+  const host_tensor<2> dOutCopy = dOut;
+  std::cout << VV(hOut) << std::endl << VV(dOutCopy) << std::endl;
 
   // Make sure the result of your implementation is correct.
   const auto maxDiff = check_result(hOut, dOut);
   std::cout << VV(maxDiff);
   if (maxDiff > 1e-4) {
-    std::cout << VV(hOut) << std::endl << VV(dOut) << std::endl;
     return EXIT_FAILURE;
   }
 
