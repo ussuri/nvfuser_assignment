@@ -104,3 +104,5 @@ MODULE.bazel.lock
 /Assignment/x64/Debug/Assignment.tlog/link.write.1.tlog
 /Assignment/x64/Debug/kernel.cu.cache
 /x64/Debug/kernel.cu.cache
+/Assignment/x64/Release
+/x64/Release

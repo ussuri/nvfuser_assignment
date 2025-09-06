@@ -187,7 +187,7 @@ int main() {
   // Make sure the result of your implementation is correct.
   const auto maxDiffOrig = check_result(hOut, dOutOrig);
   const auto maxDiffNew = check_result(hOut, dOutNew);
-  std::cout << "DIFFS:\n" << VV(maxDiffOrig) << VV(maxDiffNew);
+  std::cout << "DIFFS:\n" << VV(maxDiffOrig) << VV(maxDiffNew) << std::endl;
   
   return (maxDiffNew < 1e-4) ? EXIT_SUCCESS : EXIT_FAILURE;
 
