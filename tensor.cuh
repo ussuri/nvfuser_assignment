@@ -44,7 +44,7 @@ class tensor {
   // the data allocation. Once its refcount == 0 data refered to by allocation
   // will be deleted.
   std::shared_ptr<float> data;
-
+ 
   // Allocation of the data for instances of this class, could point to GPU or
   // CPU data.
   float* allocation = nullptr;

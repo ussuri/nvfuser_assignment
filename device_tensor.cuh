@@ -48,6 +48,12 @@ class device_tensor : public tensor<N_DIMS> {
     return *this;
   }
 
+  device_tensor<N_DIMS>& operator=(device_tensor<N_DIMS>&& other) {
+    this->allocation = other.allocation;
+    this->data = std::move(other.data);
+    return *this;
+  }
+
   // Copy constructor, useful to send data to device, careful as multiple
   // device_tensors can point to the same data buffer if this is used.
   device_tensor(const device_tensor<N_DIMS>& other)
