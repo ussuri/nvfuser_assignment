@@ -90,33 +90,37 @@ device_tensor<2> op_and_normalize_orig(device_tensor<2>& input) {
 }
 
 device_tensor<2> op_and_normalize_opt(const device_tensor<2>& input) {
+  // NOTES:
+  // 1. The std::move's below, in combination with the updated signatures of
+  // the kernel wrappers, improve performance for very small tensors by
+  // 20-30%. For large tensors, though, the effect is negligible, because the
+  // performance is dominated by the time spend in the GPU.
+  // 2. In a couple of places, std::move isn't there, because that input
+  // continues to be used further down.
+
   using kScale = std::ratio<10, 19>;
   using kEpsilon = std::ratio<1, 100'000'000'000'000UL>;
   const float n = static_cast<float>(input.size[1]);
 
-  // NOTE: std::moves below, in combination with the updated signatures of
-  // the kernel wrappers, improve performance for very small tensors by 
-  // 20-30%. For large tensors, though, the effect is negligible.
-
-  device_tensor<2> sinh_input =
+  device_tensor<2> sinh_input = //
       pointwise_apply<sinh_op<scale_op<kScale>>>(input);
-  device_tensor<1> prep_input = 
+  device_tensor<1> red_sinh_input = //
       reduce_apply<add_op<>>(sinh_input);
-  device_tensor<1> ave = 
-      pointwise_apply<div_op<>>(std::move(prep_input), n);
-  device_tensor<2> diff_sq =
+  device_tensor<1> ave = //
+      pointwise_apply<div_op<>>(std::move(red_sinh_input), n);
+  device_tensor<2> diff_sq = //
       broadcast_apply<square_op<sub_op>>(sinh_input, ave);
-  device_tensor<1> red_diff_sq = 
+  device_tensor<1> red_diff_sq = //
       reduce_apply<add_op<>>(std::move(diff_sq));
-  device_tensor<1> div_red_diff_sq =
+  device_tensor<1> div_red_diff_sq = //
       pointwise_apply<div_op<>>(std::move(red_diff_sq), n);
-  device_tensor<1> std_dev_sq =
+  device_tensor<1> std_dev_sq = //
       pointwise_apply<incr_op<kEpsilon>>(std::move(div_red_diff_sq));
-  device_tensor<2> inp_m_ave =
+  device_tensor<2> inp_m_ave = //
       broadcast_apply<sub_op>(std::move(sinh_input), ave);
-  device_tensor<1> std_dev =
+  device_tensor<1> std_dev = //
       pointwise_apply<square_root_op<>>(std::move(std_dev_sq));
-  device_tensor<2> res =
+  device_tensor<2> res = //
       broadcast_apply<div_op<>>(std::move(inp_m_ave), std::move(std_dev));
 
   return res;
@@ -183,29 +187,31 @@ int main() {
 
   // Print the amount of time required by the gpu implementation.
   std::cout << "TIMES:\n" << VV(msOrig) << VV(msNew) << std::endl;
-  
+
   // Make sure the result of your implementation is correct.
   const auto maxDiffOrig = check_result(hOut, dOutOrig);
   const auto maxDiffNew = check_result(hOut, dOutNew);
   std::cout << "DIFFS:\n" << VV(maxDiffOrig) << VV(maxDiffNew) << std::endl;
-  
+
   return (maxDiffNew < 1e-4) ? EXIT_SUCCESS : EXIT_FAILURE;
 
   // RESULTS:
-  // 
+  //
   // TL;DR: The new version is ~2x faster with no measurable loss in precision.
-  // 
+  //
   // Repesentative runs on a GeForce RTX 3070, release build:
-  // 
+  //
   //    TIMES:
   //    Old code: 1985 ms
-  //    New code + op_and_normalize_orig() (i.e. all supporting changes, but not the main one): 1678 ms
-  //    New code + op_and_normalize_opt() (i.e. everything):  960 ms
+  //    New code + op_and_normalize_orig() (i.e. all supporting changes, but not
+  //    the main one): 1678 ms New code + op_and_normalize_opt() (i.e.
+  //    everything):  960 ms
   //
   //    DIFFS:
   //    Old code: 6.48499e-05
   //    New code: 5.8651e-05
   //
   // The times are reliably reproducible. The precisions vary a bit between runs
-  // due to random initialization of the inputs, but are always at least comparable.
+  // due to random initialization of the inputs, but are always at least
+  // comparable.
 }
