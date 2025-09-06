@@ -1,5 +1,6 @@
 /*
- * A virtual scalar tensor class representing a constant while using minimal RAM.
+ * A virtual scalar tensor class representing an infinitely extended constant
+ * view while using minimal RAM.
  */
 
 #pragma once
@@ -31,10 +32,8 @@ class device_virtual_scalar : public tensor<N_DIMS> {
 
  public:
   // Allocate device tensor
-  device_virtual_scalar(
-      const std::array<size_t, N_DIMS>& size, float scalar)
-      : tensor<N_DIMS>(size), scalar_{scalar} {
-  }
+  device_virtual_scalar(const std::array<size_t, N_DIMS>& size, float scalar)
+      : tensor<N_DIMS>(size), scalar_{scalar} {}
 
   void copy(const device_tensor<N_DIMS>&) override {
     __builtin_unreachable();

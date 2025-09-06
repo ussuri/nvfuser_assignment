@@ -29,8 +29,8 @@ class device_tensor : public tensor<N_DIMS> {
     dumbly copy the memory used for it over, but functions of the shared_ptr
     are not usable on device.
     */
-    this->data = std::shared_ptr<float>(
-        this->allocation, [](float* p) { cudaFree(p); });
+    this->data =
+        std::shared_ptr<float>(this->allocation, [](float* p) { cudaFree(p); });
   }
 
  public:
@@ -83,7 +83,9 @@ class device_tensor : public tensor<N_DIMS> {
   void copy(const host_tensor<N_DIMS>&) override;
   void fill_random() override;
 
-  friend std::ostream& operator<<(std::ostream& os, const device_tensor<N_DIMS>& x) {
+  friend std::ostream& operator<<(
+      std::ostream& os,
+      const device_tensor<N_DIMS>& x) {
     return os << host_tensor<N_DIMS>{x};
   }
 };

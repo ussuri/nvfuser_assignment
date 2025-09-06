@@ -10,7 +10,8 @@ between the CPU and GPU.
 DO NOT modify code in this file.
 
 @ussuri: I only applied functional no-op changes to this file to make it the way
-         I'd actually write it, plus a couple of functionally no-op optimizations.
+         I'd actually write it, plus a couple of functionally no-op
+optimizations.
 */
 
 #pragma once
@@ -69,7 +70,9 @@ class host_tensor : public tensor<N_DIMS> {
   void fill_random() override;
   void fill(float val);
 
-  friend std::ostream& operator<<(std::ostream& os, const host_tensor<N_DIMS>& x) {
+  friend std::ostream& operator<<(
+      std::ostream& os,
+      const host_tensor<N_DIMS>& x) {
     os << "tensor<";
     for (int i = 0; i < N_DIMS; ++i) {
       os << x.size[i] << ((i < N_DIMS - 1) ? "," : "");
