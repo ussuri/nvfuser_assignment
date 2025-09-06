@@ -50,6 +50,33 @@ device_tensor<N_DIMS> pointwise_apply(
 
 /*
 PPOINTWISE KERNEL
+Will loop over elements of tensor x and y and apply an elementwise operation
+between them. i.e. out[i][j] = op::op(x[i][j], y[i][j])
+*/
+template <typename op, int N_DIMS>
+__global__ void kernel_pointwise_apply(
+    device_tensor<N_DIMS> out,
+    const device_tensor<N_DIMS> x,
+    float y) {
+  size_t i = threadIdx.x;
+  while (i < out.get_n_elems()) {
+    out.at_linear(i) = op::op(x.at_linear(i), y);
+    i += blockDim.x;
+  }
+}
+
+// GPU kernel wrapper for pointwise apply
+template <typename op, int N_DIMS>
+device_tensor<N_DIMS> pointwise_apply(
+    const device_tensor<N_DIMS>& x,
+    float y) {
+  device_tensor<N_DIMS> out(x.size);
+  kernel_pointwise_apply<op, N_DIMS><<<1, 32>>>(out, x, y);
+  return out;
+}
+
+/*
+PPOINTWISE KERNEL
 Will loop over elements of tensor x and apply an elementwise operation on it.
 i.e. out[i][j] = op::op(x[i][j])
 */

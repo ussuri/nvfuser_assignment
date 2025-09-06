@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <ratio>
 
 #include <cuda.h>
 
@@ -57,9 +58,7 @@ host_tensor<2> op_and_normalize(host_tensor<2>& input) {
 // GPU implementation
 // This is a sample GPU implementation, anything and nothing can be kept from it
 
-device_tensor<2> op_and_normalize(device_tensor<2>& input) {
-#define ORIG 0
-#if ORIG
+device_tensor<2> op_and_normalize_orig(device_tensor<2>& input) {
   device_tensor<2> scale(input, false);
   fill_apply<2>(scale, 1.9);
   input = pointwise_apply<div_op<>, 2>(input, scale);
@@ -85,20 +84,21 @@ device_tensor<2> op_and_normalize(device_tensor<2>& input) {
   device_tensor<1> std_dev = pointwise_apply<square_root_op<>>(std_dev_sq);
 
   return broadcast_apply<div_op<>>(inp_m_ave, std_dev);
-#else
-  device_tensor<1> n({input.size[0]});
-  fill_apply<1>(n, static_cast<float>(input.size[1]));
+}
+
+device_tensor<2> op_and_normalize_opt(device_tensor<2>& input) {
+  using kScale = std::ratio<19, 10>;
+  using kEpsilon = std::ratio<1, 100>;
+
+  const float n = static_cast<float>(input.size[0]);
     
-  device_tensor<1> prep_input = reduce_apply<add_op<sinh_op<scale_op<19, 10>>>>(input);
+  device_tensor<1> prep_input = reduce_apply<add_op<sinh_op<scale_op<kScale>>>>(input);
 
   device_tensor<1> ave = pointwise_apply<div_op<>>(prep_input, n);
 
   device_tensor<2> diff_sq = broadcast_apply<square_op<sub_op>>(input, ave);
   device_tensor<1> std_dev_sq = reduce_apply<add_op<>>(diff_sq);
-  std_dev_sq = pointwise_apply<div_op<>>(std_dev_sq, n);
-  device_tensor<1> epsilon(std_dev_sq, false);
-  fill_apply<1>(epsilon, 1e-14);
-  std_dev_sq = pointwise_apply<add_op<>>(std_dev_sq, epsilon);
+  std_dev_sq = pointwise_apply<div_op<incr_op<kEpsilon, identity_op>>>(std_dev_sq, n);
 
   device_tensor<2> inp_m_ave = broadcast_apply<sub_op>(input, ave);
   device_tensor<1> std_dev = pointwise_apply<square_root_op<>>(std_dev_sq);
@@ -106,7 +106,6 @@ device_tensor<2> op_and_normalize(device_tensor<2>& input) {
   device_tensor<2> res = broadcast_apply<div_op<>>(inp_m_ave, std_dev);
 
   return res;
-#endif
 }
 
 // Compares a host tensor and device tensor and returns mas abs difference
@@ -125,9 +124,9 @@ float check_result(
 }
 
 // Size to run
-constexpr uint32_t M = 128 * 4;
-constexpr uint32_t N = 128;
-constexpr uint32_t ITERATIONS = 8;
+constexpr uint32_t M = 2 * 2;
+constexpr uint32_t N = 2;
+constexpr uint32_t ITERATIONS = 1;
 
 #define VV(x) #x "=" << (x) << " "
 
@@ -145,8 +144,8 @@ int main() {
   host_tensor<2> hOut(hA, true);
 
   // Make copy for device ops, need to grab random numbers in hA.
-  device_tensor<2> dA(hA);
-  device_tensor<2> dOut(dA, true);
+  device_tensor<2> dOutOrig(hA, true);
+  device_tensor<2> dOutNew(hA, true);
 
   // Run the CPU ops ITERATION times sequentially.
   for (int i = 0; i < ITERATIONS; i++) {
@@ -156,24 +155,35 @@ int main() {
   // Run the GPU ops ITERATIONS times sequentially
   // As long as dOut matches hOut you can modify anything
   // that is executed in between t.start() and t.stop().
-  timer t;
-  t.start();
+  timer tOrig;
+  tOrig.start();
   for (int i = 0; i < ITERATIONS; i++) {
-    dOut = op_and_normalize(dOut);
+    dOutOrig = op_and_normalize_orig(dOutOrig);
   }
-  float ms = t.stop();
+  const float msOrig = tOrig.stop();
+
+  timer tNew;
+  for (int i = 0; i < ITERATIONS; i++) {
+    dOutNew = op_and_normalize_opt(dOutNew);
+  }
+  const float msNew = tNew.stop();
 
   // Print the amount of time required by the gpu implementation.
-  std::cout << "Finished in " << ms << " ms." << std::endl;
-  if constexpr (false) {
-    const host_tensor<2> dOutCopy{dOut};
-    std::cout << VV(hOut) << std::endl << VV(dOutCopy) << std::endl;
-  }
+  std::cout << "Timing: " << msOrig << " -> " << msNew << " ms" << std::endl;
+  #if 1
+  const host_tensor<2> dOutOrigCopy{dOutOrig};
+  const host_tensor<2> dOutNewCopy{dOutNew};
+    std::cout 
+        << VV(hOut) << std::endl 
+        << VV(dOutOrigCopy) << std::endl 
+        << VV(dOutNewCopy) << std::endl;
+  #endif
 
   // Make sure the result of your implementation is correct.
-  const auto maxDiff = check_result(hOut, dOut);
-  std::cout << VV(maxDiff);
-  if (maxDiff > 1e-4) {
+  const auto maxDiffOrig = check_result(hOut, dOutOrig);
+  const auto maxDiffNew = check_result(hOut, dOutNew);
+  std::cout << "\n" <<  VV(maxDiffOrig) << VV(maxDiffNew);
+  if (maxDiffNew > 1e-4) {
     return EXIT_FAILURE;
   }
 

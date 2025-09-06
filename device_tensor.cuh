@@ -66,7 +66,7 @@ class device_tensor : public tensor<N_DIMS> {
 
   // Make a new tensor from a host tensor, allocates data copies the data from
   // the host tensor
-  device_tensor(const host_tensor<N_DIMS>& other, bool copy_data = true)
+  device_tensor(const host_tensor<N_DIMS>& other, bool copy_data)
       : tensor<N_DIMS>(other.size) {
     alloc_data();
     if (copy_data)
