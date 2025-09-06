@@ -104,22 +104,32 @@ device_tensor<2> op_and_normalize_opt(const device_tensor<2>& input) {
 
   device_tensor<2> sinh_input = //
       pointwise_apply<sinh_op<scale_op<kScale>>>(input);
-  device_tensor<1> red_sinh_input = //
-      reduce_apply<add_op<>>(sinh_input);
-  device_tensor<1> ave = //
-      pointwise_apply<div_op<>>(std::move(red_sinh_input), n);
-  device_tensor<2> diff_sq = //
-      broadcast_apply<square_op<sub_op>>(sinh_input, ave);
-  device_tensor<1> red_diff_sq = //
-      reduce_apply<add_op<>>(std::move(diff_sq));
-  device_tensor<1> div_red_diff_sq = //
-      pointwise_apply<div_op<>>(std::move(red_diff_sq), n);
-  device_tensor<1> std_dev_sq = //
-      pointwise_apply<incr_op<kEpsilon>>(std::move(div_red_diff_sq));
-  device_tensor<2> inp_m_ave = //
-      broadcast_apply<sub_op>(std::move(sinh_input), ave);
-  device_tensor<1> std_dev = //
-      pointwise_apply<square_root_op<>>(std::move(std_dev_sq));
+
+  device_tensor<2> inp_m_ave{input.size};
+  device_tensor<1> std_dev{{input.size[0]}};
+
+  {
+    device_tensor<1> red_sinh_input = //
+        reduce_apply<add_op<>>(sinh_input);
+    device_tensor<1> ave = //
+        pointwise_apply<div_op<>>(std::move(red_sinh_input), n);
+    inp_m_ave = //
+        broadcast_apply<sub_op>(std::move(sinh_input), ave);
+  }
+
+  {
+    device_tensor<2> diff_sq = //
+        broadcast_apply<square_op<sub_op>>(sinh_input, ave);
+    device_tensor<1> red_diff_sq = //
+        reduce_apply<add_op<>>(std::move(diff_sq));
+    device_tensor<1> div_red_diff_sq = //
+        pointwise_apply<div_op<>>(std::move(red_diff_sq), n);
+    device_tensor<1> std_dev_sq = //
+        pointwise_apply<incr_op<kEpsilon>>(std::move(div_red_diff_sq));
+    std_dev = //
+        pointwise_apply<square_root_op<>>(std::move(std_dev_sq));
+  }
+
   device_tensor<2> res = //
       broadcast_apply<div_op<>>(std::move(inp_m_ave), std::move(std_dev));
 

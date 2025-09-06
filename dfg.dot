@@ -1,14 +1,15 @@
-digraph G {
-  sinh_input <- input
-  prep_input <- sinh_input
-  ave <- prep_input
-  diff_sq <- sinh_input ave
-  red_diff_sq <- diff_sq
-  div_red_diff_sq <- red_diff_sq
-  std_dev_sq <- div_red_diff_sq
-  inp_m_ave <- sinh_input
-  inp_m_ave <- ave
-  std_dev <- std_dev_sq
-  res <- inp_m_ave
-  res <- std_dev
+digraph {
+  sinh_input -> input
+  red_sinh_input -> sinh_input
+  ave -> red_sinh_input
+  diff_sq -> sinh_input
+  diff_sq -> ave
+  red_diff_sq -> diff_sq
+  div_red_diff_sq -> red_diff_sq
+  std_dev_sq -> div_red_diff_sq
+  inp_m_ave -> sinh_input
+  inp_m_ave -> ave
+  std_dev -> std_dev_sq
+  res -> inp_m_ave
+  res -> std_dev
 }
