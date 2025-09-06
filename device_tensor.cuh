@@ -15,33 +15,28 @@ It is unlikely you need to modify this file, but for the brave...
 #include "host_tensor.cuh"
 #include "tensor.cuh"
 
-/*
-Deleter for the shared_ptr
-shared_ptr is only used to reference count the allocations shared if the copy
-constructor is used. This ptr can not be used ondevice, as CUDA will dumbly copy
-the memory used for it over, but functions of the shared_ptr are not usable on
-device.
-*/
-struct cuda_deleter {
-  void operator()(float* p) const {
-    cudaFree(p);
-  }
-};
-
 template <int N_DIMS>
 class device_tensor : public tensor<N_DIMS> {
   friend host_tensor<N_DIMS>;
 
   // Allocate data
-  virtual void alloc_data() {
+  void alloc_data() override {
     cudaMalloc(&(this->allocation), this->get_n_elems() * sizeof(float));
-    this->data = std::shared_ptr<float>(this->allocation, cuda_deleter());
+    /*
+    Pass a custom deleter for the shared_ptr.
+    shared_ptr is only used to reference count the allocations shared if the
+    copy constructor is used. This ptr can not be used on device, as CUDA will
+    dumbly copy the memory used for it over, but functions of the shared_ptr
+    are not usable on device.
+    */
+    this->data = std::shared_ptr<float>(
+        this->allocation, [](float* p) { cudaFree(p); });
   }
 
  public:
   // Allocate device tensor
-  device_tensor(const std::array<size_t, N_DIMS> size, bool rand = false)
-      : tensor<N_DIMS>(size, rand) {
+  device_tensor(std::array<size_t, N_DIMS> size, bool rand = false)
+      : tensor<N_DIMS>(std::move(size)) {
     alloc_data();
     if (rand)
       fill_random();
@@ -78,7 +73,11 @@ class device_tensor : public tensor<N_DIMS> {
       this->copy(other);
   }
 
-  virtual void copy(const device_tensor<N_DIMS>&);
-  virtual void copy(const host_tensor<N_DIMS>&);
-  virtual void fill_random();
+  void copy(const device_tensor<N_DIMS>&) override;
+  void copy(const host_tensor<N_DIMS>&) override;
+  void fill_random() override;
 };
+
+using device_scalar = device_tensor<0>;
+using device_vector = device_tensor<1>;
+using device_matrix = device_tensor<2>;

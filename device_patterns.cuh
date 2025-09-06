@@ -17,7 +17,6 @@ __global__ void kernel_fill_apply(device_tensor<N_DIMS> x, const float val) {
 // GPU kernel wrapper for fill_apply.
 template <int N_DIMS>
 void fill_apply(device_tensor<N_DIMS>& x, const float val) {
-  // TODO(ussuri): Fixed number of blocks/threads?
   kernel_fill_apply<N_DIMS><<<1, 32>>>(x, val);
 }
 
@@ -45,8 +44,34 @@ device_tensor<N_DIMS> pointwise_apply(
     const device_tensor<N_DIMS>& y) {
   assert(x.get_n_elems() == y.get_n_elems());
   device_tensor<N_DIMS> out(x.size);
-  // TODO(ussuri): Fixed number of blocks/threads?
   kernel_pointwise_apply<op, N_DIMS><<<1, 32>>>(out, x, y);
+  return out;
+}
+
+/*
+PPOINTWISE KERNEL
+Will loop over elements of tensor x and apply an elementwise operation
+between those elements and a constant. i.e. out[i][j] = op::op(x[i][j], c)
+*/
+template <typename op, int N_DIMS>
+__global__ void kernel_pointwise_apply(
+    device_tensor<N_DIMS> out,
+    const device_tensor<N_DIMS> x,
+    float c) {
+  size_t i = threadIdx.x;
+  while (i < out.get_n_elems()) {
+    out.at_linear(i) = op::op(x.at_linear(i), c);
+    i += blockDim.x;
+  }
+}
+
+// GPU kernel wrapper for pointwise apply
+template <typename op, int N_DIMS>
+device_tensor<N_DIMS> pointwise_apply(
+    const device_tensor<N_DIMS>& x,
+    float c) {
+  device_tensor<N_DIMS> out(x.size);
+  kernel_pointwise_apply<op, N_DIMS><<<1, 32>>>(out, x, c);
   return out;
 }
 
@@ -70,8 +95,27 @@ __global__ void kernel_pointwise_apply(
 template <typename op, int N_DIMS>
 device_tensor<N_DIMS> pointwise_apply(const device_tensor<N_DIMS>& x) {
   device_tensor<N_DIMS> out(x.size);
-  // TODO(ussuri): Fixed number of blocks/threads?
   kernel_pointwise_apply<op, N_DIMS><<<1, 32>>>(out, x);
+  return out;
+}
+
+/* REDUCTION KERNEL
+Takes a 1D tensor and reduces it to a 1-element 0D tensor.
+*/
+template <typename op>
+__global__ void reduce_dim_1(device_tensor<0> out, const device_tensor<1> in) {
+  float red = op::init();
+  for (size_t i = 0; i < in.size[0]; ++i) {
+    red = op::op(in.at(i), red);
+  }
+  out.at(0) = red;
+}
+
+// GPU kernel wrapper for reduce_dim_1
+template <typename op>
+device_tensor<0> reduce_apply(const device_tensor<1>& x) {
+  device_tensor<0> out({1});
+  reduce_dim_1<op><<<1, 32>>>(out, x);
   return out;
 }
 
@@ -86,21 +130,18 @@ __global__ void reduce_dim_1(device_tensor<1> out, const device_tensor<2> in) {
   size_t i = threadIdx.x;
   while (i < in.size[0]) {
     float red = op::init();
-
     for (size_t j = 0; j < in.size[1]; j++) {
       red = op::op(in.at(i, j), red);
     }
-
     out.at(i) = red;
     i += blockDim.x;
   }
 }
 
-// GPU kernel wrapper for reduce dim=1
+// GPU kernel wrapper for reduce_dim_1
 template <typename op>
 device_tensor<1> reduce_apply(const device_tensor<2>& x) {
   device_tensor<1> out({x.size[0]});
-  // TODO(ussuri): Fixed number of blocks/threads?
   reduce_dim_1<op><<<1, 32>>>(out, x);
   return out;
 }
@@ -146,7 +187,6 @@ device_tensor<2> broadcast_apply(
     const device_tensor<1>& y) {
   assert(x.size[0] == y.get_n_elems());
   device_tensor<2> out(x.size);
-  // TODO(ussuri): Fixed number of blocks/threads?
   kernel_broadcast_apply<op><<<1, 32>>>(out, x, y);
   return out;
 }
@@ -158,7 +198,6 @@ device_tensor<2> broadcast_apply(
     const device_tensor<2>& y) {
   assert(x.get_n_elems() == y.size[0]);
   device_tensor<2> out(y.size);
-  // TODO(ussuri): Fixed number of blocks/threads?
   kernel_broadcast_apply<op><<<1, 32>>>(out, x, y);
   return out;
 }

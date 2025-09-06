@@ -24,17 +24,17 @@ class device_tensor;
 template <int>
 class host_tensor;
 
-// Base class for device/host tensor classes
-// N_DIMS is the dimensionality of the class
+// Base class for device/host tensor classes.
+// N_DIMS is the dimensionality of the class.
+// N_DIMS==0 is a special case: a tensor-like representation of a scalar.
 template <int N_DIMS>
 class tensor {
  protected:
   // Total number of elements the tensor holds
-  size_t n_elems = 0;
+  size_t n_elems = 1;
 
   // Set the above value based on size array
   void set_n_elems() {
-    n_elems = 1;
     for (int i = 0; i < N_DIMS; i++) {
       n_elems *= size[i];
     }
@@ -89,60 +89,91 @@ class tensor {
 
   // Access the element at [x] for 1D tensors.
   __host__ __device__ __inline__ float& at(size_t x) {
-    static_assert(N_DIMS == 1, "Trying to use 1D accessor on non-1D tensor.\n");
-    return *(this->get() + x);
+    if constexpr (N_DIMS == 0) {
+      return *(this->get());
+    } else {
+      static_assert(N_DIMS == 1, "Trying to use 1D accessor on non-1D tensor.\n");
+      return *(this->get() + x);
+    }
   }
 
   // If tensor is 2 or 3 dimensional, will treat it as a row major 1D tensor of
   // size n_elements.
   __host__ __device__ __inline__ float& at_linear(size_t x) {
-    return this->get()[x];
+    if constexpr (N_DIMS == 0) {
+      return *this->get();
+    } else {
+      return this->get()[x];
+    }
   }
 
   // Const versions of at above
-  __host__ __device__ __inline__ const float& at(size_t x, size_t y, size_t z)
-      const {
-    static_assert(N_DIMS == 3, "Trying to use 3D accessor on non-3D tensor.\n");
-    return *(this->get() + x * size[1] * size[2] + y * size[2] + z);
+  __host__ __device__ __inline__ float at(size_t x, size_t y, size_t z) const {
+    if constexpr (N_DIMS == 0) {
+      return *this->get();
+    } else {
+      static_assert(
+          N_DIMS == 3, "Trying to use 3D accessor on non-3D tensor.\n");
+      return *(this->get() + x * size[1] * size[2] + y * size[2] + z);
+    }
   }
 
   // Const versions of at above
-  __host__ __device__ __inline__ const float& at(size_t x, size_t y) const {
-    static_assert(N_DIMS == 2, "Trying to use 2D accessor on non-2D tensor.\n");
-    return *(this->get() + x * size[1] + y);
+  __host__ __device__ __inline__ float at(size_t x, size_t y) const {
+    if constexpr (N_DIMS == 0) {
+      return *this->get();
+    } else {
+      static_assert(
+          N_DIMS == 2, "Trying to use 2D accessor on non-2D tensor.\n");
+      return *(this->get() + x * size[1] + y);
+    }
   }
 
   // Const versions of at above
-  __host__ __device__ __inline__ const float& at(size_t x) const {
-    static_assert(N_DIMS == 1, "Trying to use 1D accessor on non-1D tensor.\n");
-    return *(this->get() + x);
+  __host__ __device__ __inline__ float at(size_t x) const {
+    if constexpr (N_DIMS == 0) {
+      return *this->get();
+    } else {
+      static_assert(
+          N_DIMS == 1, "Trying to use 1D accessor on non-1D tensor.\n");
+      return *(this->get() + x);
+    }
   }
 
   // Const versions of at_linear above
-  __host__ __device__ __inline__ const float& at_linear(size_t x) const {
-    return this->get()[x];
+  __host__ __device__ __inline__ float at_linear(size_t x) const {
+    if constexpr (N_DIMS == 0) {
+      return *this->get();
+    } else {
+      return this->get()[x];
+    }
   }
 
   // Construct tensor based on size, maybe fill with random data.
-  tensor(const std::array<size_t, N_DIMS> size, bool rand = false)
-      : size{size} {
-    static_assert(
-        N_DIMS <= 3, "Tensor class only supports upto 3 dimensions.\n");
-    static_assert(
-        N_DIMS >= 1, "Tensor class must be at least 1 dimensional.\n");
+  tensor(std::array<size_t, N_DIMS> size)
+      : size{std::move(size)} {
+    if constexpr (N_DIMS == 0) {
+      // A special case: scalar tensor with only one physically stored element
+      // that is programmatically extended to `size` virtual elements.
+    } else {
+      static_assert(
+          N_DIMS >= 1 && N_DIMS <= 3,
+          "Non-scalar tensor class only supports between 1 and 3 "
+          "dimensions.\n");
+    }
     set_n_elems();
-    // TODO(ussuri): `rand` is ignored, and `fill_random()` can't be easily used
-    // here anyway (virtual resolution is off).
   }
 
-  friend std::ostream& operator<<(std::ostream& os, const tensor<N_DIMS>& t) {
+  friend std::ostream& operator<<(std::ostream& os, const tensor<N_DIMS>& x) {
     os << "tensor<";
     for (int i = 0; i < N_DIMS; ++i) {
-      os << t.size[i] << ((i < N_DIMS - 1) ? "," : "");
+      os << x.size[i] << ((i < N_DIMS - 1) ? "," : "");
     }
-    os << ">{";
-    for (int i = 0; i < t.get_n_elems(); ++i) {
-      os << t.at_linear(i) << (i < t.get_n_elems() - 1 ? ", " : "");
+    os << "> = {";
+    for (int i = 0, n = x.get_n_elems(); i < n; ++i) {
+      os << x.at_linear(i);
+      if (i < n - 1) 
+        os << ", ";
     }
     os << "}";
     return os;

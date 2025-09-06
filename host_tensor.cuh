@@ -8,6 +8,9 @@ This object is useful for manipulating data on the CPU and transfering data
 between the CPU and GPU.
 
 DO NOT modify code in this file.
+
+@ussuri: I only applied functional no-op changes to this file to make it the way
+         I'd actually write it, plus a couple of functionally no-op optimizations.
 */
 
 #pragma once
@@ -15,21 +18,16 @@ DO NOT modify code in this file.
 #include "device_tensor.cuh"
 #include "tensor.cuh"
 
-// Deleter for shared_ptr, when shared_ptr ref_count=0 memory will be freed
-struct host_deleter {
-  void operator()(float* p) const {
-    delete[] p;
-  }
-};
-
 template <int N_DIMS>
 class host_tensor : public tensor<N_DIMS> {
   friend device_tensor<N_DIMS>;
 
   // Allocate CPU data
-  virtual void alloc_data() {
+  void alloc_data() override {
     this->allocation = new float[this->get_n_elems()];
-    this->data = std::shared_ptr<float>(this->allocation, host_deleter());
+    // Pass a custom deleter for shared_ptr.
+    this->data =
+        std::shared_ptr<float>(this->allocation, [](float* p) { delete[] p; });
   }
 
  public:
@@ -41,8 +39,8 @@ class host_tensor : public tensor<N_DIMS> {
 
   // Construct new host_tensor based on sizes, rand=True will fill with random
   // values between -1.0 and 1.0
-  host_tensor(const std::array<size_t, N_DIMS> size, bool rand = false)
-      : tensor<N_DIMS>(size, false) {
+  host_tensor(std::array<size_t, N_DIMS> size, bool rand = false)
+      : tensor<N_DIMS>(std::move(size)) {
     alloc_data();
     if (rand)
       fill_random();
@@ -66,8 +64,8 @@ class host_tensor : public tensor<N_DIMS> {
       this->copy(other);
   }
 
-  virtual void copy(const device_tensor<N_DIMS>&);
-  virtual void copy(const host_tensor<N_DIMS>&);
-  virtual void fill_random();
+  void copy(const device_tensor<N_DIMS>&) override;
+  void copy(const host_tensor<N_DIMS>&) override;
+  void fill_random() override;
   void fill(float val);
 };

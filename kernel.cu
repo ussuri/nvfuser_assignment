@@ -56,6 +56,11 @@ host_tensor<2> op_and_normalize(host_tensor<2>& input) {
 
 // GPU implementation
 // This is a sample GPU implementation, anything and nothing can be kept from it
+
+#define ORIG 0
+
+#if ORIG
+
 device_tensor<2> op_and_normalize(device_tensor<2>& input) {
   device_tensor<2> scale(input, false);
   fill_apply<2>(scale, 1.9);
@@ -63,27 +68,49 @@ device_tensor<2> op_and_normalize(device_tensor<2>& input) {
   input = pointwise_apply<sinh_op, 2>(input);
 
   auto ave = reduce_apply<add_op>(input);
-
+  
   device_tensor<1> n(ave, false);
   fill_apply<1>(n, (float)input.size[1]);
-
+  
   ave = pointwise_apply<div_op, 1>(ave, n);
-
+  
   auto diff = broadcast_apply<sub_op>(input, ave);
   auto diff_sq = pointwise_apply<square_op>(diff);
   auto std_dev_sq = reduce_apply<add_op>(diff_sq);
   std_dev_sq = pointwise_apply<div_op>(std_dev_sq, n);
-
+  
   device_tensor<1> epsilon(std_dev_sq, false);
   fill_apply<1>(epsilon, 1e-14);
-
+  
   auto inp_m_ave = broadcast_apply<sub_op>(input, ave);
-
+  
   std_dev_sq = pointwise_apply<add_op>(std_dev_sq, epsilon);
   auto std_dev = pointwise_apply<square_root_op>(std_dev_sq);
-
+  
   return broadcast_apply<div_op>(inp_m_ave, std_dev);
 }
+
+#else
+
+namespace {
+  constexpr float epsilon = 1e-14;
+}  // namespace
+
+device_tensor<2> op_and_normalize(device_tensor<2>& input) {
+  const size_t n = input.size[1];
+  device_tensor<1> ave = pointwise_apply<div_op<>>(reduce_apply<add_op<sinh_op<scale_op<19, 10>>>>(input), n);
+  device_tensor<2> diff_sq = broadcast_apply<square_op<sub_op>>(input, ave);
+  device_tensor<0> std_dev_sq = pointwise_apply<div_op<>>(reduce_apply<add_op<>>(reduce_apply<add_op<>>(diff_sq)), n);
+  assert(std_dev_sq.get_n_elems() > 0);
+  device_tensor<0> std_dev = pointwise_apply<square_root_op<>>(std_dev_sq);
+  assert(std_dev.get_n_elems() > 0);
+  device_tensor<2> inp_m_ave = broadcast_apply<sub_op>(input, ave);
+  device_tensor<2> res =
+      pointwise_apply<div_op<>>(inp_m_ave, std_dev.at_linear(0));
+  return res;
+}
+
+#endif 
 
 // Compares a host tensor and device tensor and returns mas abs difference
 // between them
@@ -101,8 +128,8 @@ float check_result(
 }
 
 // Size to run
-constexpr uint32_t M = 8 * 4;
-constexpr uint32_t N = 8;
+constexpr uint32_t M = 1024 * 4;
+constexpr uint32_t N = 1024;
 constexpr uint32_t ITERATIONS = 8;
 
 #define VV(x) #x "=" << (x) << " "
@@ -142,7 +169,7 @@ int main() {
   // Print the amount of time required by the gpu implementation.
   std::cout << "Finished in " << ms << " ms." << std::endl;
   if constexpr (false) {
-    const host_tensor<2> dOutCopy = dOut;
+    const host_tensor<2> dOutCopy{dOut};
     std::cout << VV(hOut) << std::endl << VV(dOutCopy) << std::endl;
   }
 

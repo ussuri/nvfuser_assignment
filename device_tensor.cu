@@ -27,6 +27,7 @@ void device_tensor<N_DIMS>::copy(const host_tensor<N_DIMS>& other) {
 };
 
 // Instantiate
+template class device_tensor<0>;
 template class device_tensor<1>;
 template class device_tensor<2>;
 template class device_tensor<3>;
