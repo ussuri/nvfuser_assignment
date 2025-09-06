@@ -95,7 +95,10 @@
       "semaphore": "cpp",
       "shared_mutex": "cpp",
       "text_encoding": "cpp",
-      "thread": "cpp"
+      "thread": "cpp",
+      "future": "cpp",
+      "coroutine": "cpp",
+      "resumable": "cpp"
     }
   }
 }

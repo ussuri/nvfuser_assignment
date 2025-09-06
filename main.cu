@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <ratio>
+#include <type_traits>
 
 #include <cuda.h>
 
@@ -64,78 +65,74 @@ host_tensor<2> op_and_normalize(host_tensor<2>& input) {
 device_tensor<2> op_and_normalize_orig(device_tensor<2>& input) {
   device_tensor<2> scale(input, false);
   fill_apply<2>(scale, 1.9);
-  input = pointwise_apply<div_op<>, 2>(input, scale);
-  input = pointwise_apply<sinh_op<>, 2>(input);
+  input = pointwise_apply_2t<div_op<>, 2>(input, scale);
+  input = pointwise_apply_1t<sinh_op<>, 2>(input);
 
   auto ave = reduce_apply<add_op<>>(input);
 
   device_tensor<1> n(ave, false);
   fill_apply<1>(n, (float)input.size[1]);
 
-  ave = pointwise_apply<div_op<>, 1>(ave, n);
+  ave = pointwise_apply_2t<div_op<>, 1>(ave, n);
 
-  auto diff = broadcast_apply<sub_op>(input, ave);
-  auto diff_sq = pointwise_apply<square_op<>>(diff);
+  auto diff = broadcast_apply_21<sub_op>(input, ave);
+  auto diff_sq = pointwise_apply_1t<square_op<>>(diff);
   auto std_dev_sq = reduce_apply<add_op<>>(diff_sq);
-  std_dev_sq = pointwise_apply<div_op<>>(std_dev_sq, n);
+  std_dev_sq = pointwise_apply_2t<div_op<>>(std_dev_sq, n);
 
   device_tensor<1> epsilon(std_dev_sq, false);
   fill_apply<1>(epsilon, 1e-14);
 
-  auto inp_m_ave = broadcast_apply<sub_op>(input, ave);
+  auto inp_m_ave = broadcast_apply_21<sub_op>(input, ave);
 
-  std_dev_sq = pointwise_apply<add_op<>>(std_dev_sq, epsilon);
-  auto std_dev = pointwise_apply<square_root_op<>>(std_dev_sq);
+  std_dev_sq = pointwise_apply_2t<add_op<>>(std_dev_sq, epsilon);
+  auto std_dev = pointwise_apply_1t<square_root_op<>>(std_dev_sq);
 
-  return broadcast_apply<div_op<>>(inp_m_ave, std_dev);
+  return broadcast_apply_21<div_op<>>(inp_m_ave, std_dev);
 }
 
-device_tensor<2> op_and_normalize_opt(const device_tensor<2>& input) {
-  // NOTES:
-  // 1. The std::move's below, in combination with the updated signatures of
-  // the kernel wrappers, improve performance for very small tensors by
-  // 20-30%. For large tensors, though, the effect is negligible, because the
-  // performance is dominated by the time spend in the GPU.
-  // 2. In a couple of places, std::move isn't there, because that input
-  // continues to be used further down.
+namespace {
 
+template <int N_DIMS>
+using future_device_tensor = std::shared_future<device_tensor<N_DIMS>>;
+
+// Just a convenience wrapper around std::async.
+template <typename F, typename... Args>
+auto real_async(F&& func, Args&&... args) {
+  // TODO(ussuri): Should `std::forward<Args...>(args...)`, but that breaks for
+  // a couple of uses in `op_and_normalize_opt()`. Fix later.
+  return std::async(std::launch::async, std::forward<F>(func), args...);
+}
+
+} // namespace
+
+device_tensor<2> op_and_normalize_opt(const device_tensor<2>& input) {
   using kScale = std::ratio<10, 19>;
   using kEpsilon = std::ratio<1, 100'000'000'000'000UL>;
-  const float n = static_cast<float>(input.size[1]);
+  float n = static_cast<float>(input.size[1]);
 
-  device_tensor<2> sinh_input = //
-      pointwise_apply<sinh_op<scale_op<kScale>>>(input);
-  device_tensor<1> red_sinh_input = //
-      reduce_apply<add_op<>>(sinh_input);
-  device_tensor<1> ave = //
-      pointwise_apply<div_op<>>(std::move(red_sinh_input), n);
+  future_device_tensor<2> sinh_input =
+      real_async(pointwise_apply_1t<sinh_op<scale_op<kScale>>, 2>, input);
+  future_device_tensor<1> red_sinh_input =
+      real_async(reduce_apply<add_op<>>, sinh_input.get());
+  future_device_tensor<1> ave =
+      real_async(pointwise_apply_ts<div_op<>, 1>, red_sinh_input.get(), n);
+  future_device_tensor<2> inp_m_ave =
+      real_async(broadcast_apply_21<sub_op>, sinh_input.get(), ave.get());
+  future_device_tensor<2> diff_sq = real_async(
+      broadcast_apply_21<square_op<sub_op>>, sinh_input.get(), ave.get());
+  future_device_tensor<1> red_diff_sq =
+      real_async(reduce_apply<add_op<>>, diff_sq.get());
+  future_device_tensor<1> div_red_diff_sq =
+      real_async(pointwise_apply_ts<div_op<>, 1>, red_diff_sq.get(), n);
+  future_device_tensor<1> std_dev_sq = real_async(
+      pointwise_apply_1t<incr_op<kEpsilon>, 1>, div_red_diff_sq.get());
+  future_device_tensor<1> std_dev =
+      real_async(pointwise_apply_1t<square_root_op<>, 1>, std_dev_sq.get());
+  future_device_tensor<2> res =
+      real_async(broadcast_apply_21<div_op<>>, inp_m_ave.get(), std_dev.get());
 
-  std::future<device_tensor<2>> inp_m_ave = std::async(
-      std::launch::async, //
-      [&]() { //
-        return broadcast_apply<sub_op>(std::move(sinh_input), ave);
-      });
-
-  std::future<device_tensor<1>> std_dev = std::async(
-      std::launch::async, //
-      [&]() {
-        device_tensor<2> diff_sq = //
-            broadcast_apply<square_op<sub_op>>(sinh_input, ave);
-        device_tensor<1> red_diff_sq = //
-            reduce_apply<add_op<>>(std::move(diff_sq));
-        device_tensor<1> div_red_diff_sq = //
-            pointwise_apply<div_op<>>(std::move(red_diff_sq), n);
-        device_tensor<1> std_dev_sq = //
-            pointwise_apply<incr_op<kEpsilon>>(std::move(div_red_diff_sq));
-        return //
-            pointwise_apply<square_root_op<>>(std::move(std_dev_sq));
-      });
-
-  device_tensor<2> res = //
-      broadcast_apply<div_op<>>(
-          std::move(inp_m_ave.get()), std::move(std_dev.get()));
-
-  return res;
+  return res.get();
 }
 
 // Compares a host tensor and device tensor and returns mas abs difference
