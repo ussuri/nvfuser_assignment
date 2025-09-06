@@ -210,12 +210,14 @@ int main() {
   //
   // Repesentative runs on a GeForce RTX 3070, release build:
   //
-  // RUNNING TIMES on a GeForce RTX 3070, release build:
-  //   Old code: 1985 ms
-  //   New code + op_and_normalize_orig() (== just supporting changes): 1678 ms
-  //   New code + op_and_normalize_opt() (== everything):  960 ms
+  // TYPICAL RUNNING TIMES on a GeForce RTX 3070, release build:
+  //   Old code + <<<1, 32>>>                                      : 1985 ms
+  //   New code + Original op_and_normalize_orig() + <<<1, 32>>>   : 1678 ms
+  //   New code + New op_and_normalize_opt() + <<<1, 32>>>         :  960 ms
+  //   New code + Original op_and_normalize_orig() + <<<1, 4096>>> :   42 ms
+  //   New code + New op_and_normalize_opt() + <<<1, 4096>>>       :   23 ms
   //
-  // DIFFS:
+  // TYPICAL DIFFS:
   //   Old code: 6.48499e-05
   //   New code: 5.8651e-05
   //
