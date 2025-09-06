@@ -34,7 +34,6 @@ void host_tensor<N_DIMS>::copy(const host_tensor<N_DIMS>& other) {
 };
 
 // Instantiate
-template class host_tensor<0>;
 template class host_tensor<1>;
 template class host_tensor<2>;
 template class host_tensor<3>;

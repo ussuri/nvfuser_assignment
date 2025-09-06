@@ -89,78 +89,49 @@ class tensor {
 
   // Access the element at [x] for 1D tensors.
   __host__ __device__ __inline__ float& at(size_t x) {
-    if constexpr (N_DIMS == 0) {
-      return *(this->get());
-    } else {
-      static_assert(N_DIMS == 1, "Trying to use 1D accessor on non-1D tensor.\n");
-      return *(this->get() + x);
-    }
+    static_assert(N_DIMS == 1, "Trying to use 1D accessor on non-1D tensor.\n");
+    return *(this->get() + x);
   }
 
   // If tensor is 2 or 3 dimensional, will treat it as a row major 1D tensor of
   // size n_elements.
   __host__ __device__ __inline__ float& at_linear(size_t x) {
-    if constexpr (N_DIMS == 0) {
-      return *this->get();
-    } else {
-      return this->get()[x];
-    }
+    return this->get()[x];
   }
 
   // Const versions of at above
   __host__ __device__ __inline__ float at(size_t x, size_t y, size_t z) const {
-    if constexpr (N_DIMS == 0) {
-      return *this->get();
-    } else {
-      static_assert(
-          N_DIMS == 3, "Trying to use 3D accessor on non-3D tensor.\n");
-      return *(this->get() + x * size[1] * size[2] + y * size[2] + z);
-    }
+    static_assert(
+        N_DIMS == 3, "Trying to use 3D accessor on non-3D tensor.\n");
+    return *(this->get() + x * size[1] * size[2] + y * size[2] + z);
   }
 
   // Const versions of at above
   __host__ __device__ __inline__ float at(size_t x, size_t y) const {
-    if constexpr (N_DIMS == 0) {
-      return *this->get();
-    } else {
-      static_assert(
-          N_DIMS == 2, "Trying to use 2D accessor on non-2D tensor.\n");
-      return *(this->get() + x * size[1] + y);
-    }
+    static_assert(
+        N_DIMS == 2, "Trying to use 2D accessor on non-2D tensor.\n");
+    return *(this->get() + x * size[1] + y);
   }
 
   // Const versions of at above
   __host__ __device__ __inline__ float at(size_t x) const {
-    if constexpr (N_DIMS == 0) {
-      return *this->get();
-    } else {
-      static_assert(
-          N_DIMS == 1, "Trying to use 1D accessor on non-1D tensor.\n");
-      return *(this->get() + x);
-    }
+    static_assert(
+        N_DIMS == 1, "Trying to use 1D accessor on non-1D tensor.\n");
+    return *(this->get() + x);
   }
 
   // Const versions of at_linear above
   __host__ __device__ __inline__ float at_linear(size_t x) const {
-    if constexpr (N_DIMS == 0) {
-      return *this->get();
-    } else {
-      return this->get()[x];
-    }
+    return this->get()[x];
   }
 
   // Construct tensor based on size, maybe fill with random data.
   tensor(std::array<size_t, N_DIMS> size)
       : size{std::move(size)} {
-    if constexpr (N_DIMS == 0) {
-      // A special case: scalar tensor with only one physically stored element
-      // that is programmatically extended to `size` virtual elements.
-    } else {
-      static_assert(
-          N_DIMS >= 1 && N_DIMS <= 3,
-          "Non-scalar tensor class only supports between 1 and 3 "
-          "dimensions.\n");
-    }
+    static_assert(
+        N_DIMS >= 1 && N_DIMS <= 3,
+        "Non-scalar tensor class only supports between 1 and 3 "
+        "dimensions.\n");
     set_n_elems();
   }
 
