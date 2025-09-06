@@ -5,7 +5,7 @@ template <int N_DIMS>
 void host_tensor<N_DIMS>::fill_random() {
   srand(static_cast<int>(time(NULL)));
   for (size_t i = 0; i < this->get_n_elems(); i++) {
-    this->get()[i] = static_cast<float>(rand() / RAND_MAX * 2.0 - 1.0);
+    this->get()[i] = static_cast<float>(rand()) / RAND_MAX * 2.0 - 1.0;
   }
 }
 

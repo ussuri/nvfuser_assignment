@@ -10,18 +10,18 @@ struct identity_op {
   }
 };
 
-template <int NUM = 1, int DENOM = 1>
+template <typename scale>
 struct scale_op {
   __host__ __device__ static inline float op(const float& a) {
-    return a * NUM / DENOM;
+    return a * scale::num / scale::den;
   }
 };
 
-// NOTE: Must take `INCR` by ref b/c pure float template params are non-standard.
-template <const float& INCR>
+// NOTE: Take `INCR` by ref b/c pure float template params are non-standard.
+template <typename incr, typename inner_op>
 struct incr_op {
-  __host__ __device__ inline float op(const float& a) {
-    return a + INCR;
+  __host__ __device__ static inline float op(const float& a) {
+    return inner_op::op(a) + (1.0L * incr::num / incr::den);
   }
 };
 
