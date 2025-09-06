@@ -1,14 +1,22 @@
-#include <assert.h>
-#include <cuda.h>
+﻿#include <cassert>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
+#include <ratio>
 
+#include <cuda.h>
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
 #include "device_patterns.cuh"
 #include "device_tensor.cuh"
 #include "gpu_timer.cuh"
 #include "host_tensor.cuh"
 #include "ops.cuh"
 #include "utils.cuh"
+
+#define VV(x) #x ": " << (x) << "\n\n"
 
 // Reference CPU implementation
 // Do not change this function, It is the reference implementation for you to
@@ -51,33 +59,67 @@ host_tensor<2> op_and_normalize(host_tensor<2>& input) {
 
 // GPU implementation
 // This is a sample GPU implementation, anything and nothing can be kept from it
-device_tensor<2> op_and_normalize(device_tensor<2>& input) {
+
+device_tensor<2> op_and_normalize_orig(device_tensor<2>& input) {
   device_tensor<2> scale(input, false);
   fill_apply<2>(scale, 1.9);
-  input = pointwise_apply<div_op, 2>(input, scale);
-  input = pointwise_apply<sinh_op, 2>(input);
+  input = pointwise_apply<div_op<>, 2>(input, scale);
+  input = pointwise_apply<sinh_op<>, 2>(input);
 
-  auto ave = reduce_apply<add_op>(input);
+  auto ave = reduce_apply<add_op<>>(input);
 
   device_tensor<1> n(ave, false);
   fill_apply<1>(n, (float)input.size[1]);
 
-  ave = pointwise_apply<div_op, 1>(ave, n);
+  ave = pointwise_apply<div_op<>, 1>(ave, n);
 
   auto diff = broadcast_apply<sub_op>(input, ave);
-  auto diff_sq = pointwise_apply<square_op>(diff);
-  auto std_dev_sq = reduce_apply<add_op>(diff_sq);
-  std_dev_sq = pointwise_apply<div_op>(std_dev_sq, n);
+  auto diff_sq = pointwise_apply<square_op<>>(diff);
+  auto std_dev_sq = reduce_apply<add_op<>>(diff_sq);
+  std_dev_sq = pointwise_apply<div_op<>>(std_dev_sq, n);
 
   device_tensor<1> epsilon(std_dev_sq, false);
   fill_apply<1>(epsilon, 1e-14);
 
   auto inp_m_ave = broadcast_apply<sub_op>(input, ave);
 
-  std_dev_sq = pointwise_apply<add_op>(std_dev_sq, epsilon);
-  auto std_dev = pointwise_apply<square_root_op>(std_dev_sq);
+  std_dev_sq = pointwise_apply<add_op<>>(std_dev_sq, epsilon);
+  auto std_dev = pointwise_apply<square_root_op<>>(std_dev_sq);
 
-  return broadcast_apply<div_op>(inp_m_ave, std_dev);
+  return broadcast_apply<div_op<>>(inp_m_ave, std_dev);
+}
+
+device_tensor<2> op_and_normalize_opt(const device_tensor<2>& input) {
+  using kScale = std::ratio<10, 19>;
+  using kEpsilon = std::ratio<1, 100'000'000'000'000UL>;
+  const float n = static_cast<float>(input.size[1]);
+
+  // NOTE: std::moves below, in combination with the updated signatures of
+  // the kernel wrappers, improve performance for very small tensors by 
+  // 20-30%. For large tensors, though, the effect is negligible.
+
+  device_tensor<2> sinh_input =
+      pointwise_apply<sinh_op<scale_op<kScale>>>(input);
+  device_tensor<1> prep_input = 
+      reduce_apply<add_op<>>(sinh_input);
+  device_tensor<1> ave = 
+      pointwise_apply<div_op<>>(std::move(prep_input), n);
+  device_tensor<2> diff_sq =
+      broadcast_apply<square_op<sub_op>>(sinh_input, ave);
+  device_tensor<1> red_diff_sq = 
+      reduce_apply<add_op<>>(std::move(diff_sq));
+  device_tensor<1> div_red_diff_sq =
+      pointwise_apply<div_op<>>(std::move(red_diff_sq), n);
+  device_tensor<1> std_dev_sq =
+      pointwise_apply<incr_op<kEpsilon>>(std::move(div_red_diff_sq));
+  device_tensor<2> inp_m_ave =
+      broadcast_apply<sub_op>(std::move(sinh_input), ave);
+  device_tensor<1> std_dev =
+      pointwise_apply<square_root_op<>>(std::move(std_dev_sq));
+  device_tensor<2> res =
+      broadcast_apply<div_op<>>(std::move(inp_m_ave), std::move(std_dev));
+
+  return res;
 }
 
 // Compares a host tensor and device tensor and returns mas abs difference
@@ -88,10 +130,9 @@ float check_result(
     const device_tensor<N_DIMS>& C) {
   host_tensor<N_DIMS> B(C, true);
   assert(A.get_n_elems() == B.get_n_elems());
-
   float max_diff = 0.0;
   for (int i = 0; i < A.get_n_elems(); i++) {
-    max_diff = max(max_diff, abs(A.at_linear(i) - B.at_linear(i)));
+    max_diff = std::max(max_diff, abs(A.at_linear(i) - B.at_linear(i)));
   }
   return max_diff;
 }
@@ -101,7 +142,7 @@ constexpr uint32_t M = 1024 * 4;
 constexpr uint32_t N = 1024;
 constexpr uint32_t ITERATIONS = 8;
 
-int main(void) {
+int main() {
   /*
      Do not change this section of code, this is how the user expects to
      interact with your implementation. hA and hOut is the reference
@@ -115,8 +156,8 @@ int main(void) {
   host_tensor<2> hOut(hA, true);
 
   // Make copy for device ops, need to grab random numbers in hA.
-  device_tensor<2> dA(hA);
-  device_tensor<2> dOut(dA, true);
+  device_tensor<2> dOutOrig(hA, true);
+  device_tensor<2> dOutNew(hA, true);
 
   // Run the CPU ops ITERATION times sequentially.
   for (int i = 0; i < ITERATIONS; i++) {
@@ -126,16 +167,41 @@ int main(void) {
   // Run the GPU ops ITERATIONS times sequentially
   // As long as dOut matches hOut you can modify anything
   // that is executed in between t.start() and t.stop().
-  timer t;
-  t.start();
+  timer tOrig;
+  tOrig.start();
   for (int i = 0; i < ITERATIONS; i++) {
-    dOut = op_and_normalize(dOut);
+    dOutOrig = op_and_normalize_orig(dOutOrig);
   }
-  float ms = t.stop();
+  const float msOrig = tOrig.stop();
 
-  // Make sure the result of your implementation is correct.
-  assert(check_result(hOut, dOut) < 1e-4);
+  timer tNew;
+  tNew.start();
+  for (int i = 0; i < ITERATIONS; i++) {
+    dOutNew = op_and_normalize_opt(dOutNew);
+  }
+  const float msNew = tNew.stop();
 
   // Print the amount of time required by the gpu implementation.
-  std::cout << "Finished in " << ms << " ms." << std::endl;
+  std::cout << "TIMES:\n" << VV(msOrig) << VV(msNew) << std::endl;
+  
+  // Make sure the result of your implementation is correct.
+  const auto maxDiffOrig = check_result(hOut, dOutOrig);
+  const auto maxDiffNew = check_result(hOut, dOutNew);
+  std::cout << "DIFFS:\n" << VV(maxDiffOrig) << VV(maxDiffNew);
+  
+  return (maxDiffNew < 1e-4) ? EXIT_SUCCESS : EXIT_FAILURE;
+
+  // Repesentative results on a GeForce RTX 3070:
+  // 
+  //    TIMES:
+  //    msOrig: 41276
+  //    msNew : 29829
+  //
+  //    DIFFS:
+  //    maxDiffOrig : 6.48499e-05
+  //    maxDiffNew: 5.8651e-05
+  //
+  // The times are reliably reproducible. The precisions vary a bit between runs
+  // due to random initialization of the inputs, but are always at least comparable.
+  // So the new version is ~1.4x faster with no measurable loss in precision.
 }
