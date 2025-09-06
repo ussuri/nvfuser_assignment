@@ -124,9 +124,9 @@ float check_result(
 }
 
 // Size to run
-constexpr uint32_t M = 2 * 2;
-constexpr uint32_t N = 2;
-constexpr uint32_t ITERATIONS = 1;
+constexpr uint32_t M = 1024 * 4;
+constexpr uint32_t N = 1024;
+constexpr uint32_t ITERATIONS = 8;
 
 int main() {
   /*
@@ -168,20 +168,24 @@ int main() {
   const float msNew = tNew.stop();
 
   // Print the amount of time required by the gpu implementation.
-  std::cout << VV(msOrig) << VV(msNew) << std::endl;
-  #if 1
-  const host_tensor<2> dOutOrigCopy{dOutOrig};
-  const host_tensor<2> dOutNewCopy{dOutNew};
-  std::cout << VV(hOut) << VV(dOutOrigCopy) << VV(dOutNewCopy);
-  #endif
-
+  std::cout << "TIMES:\n" << VV(msOrig) << VV(msNew) << std::endl;
+  
   // Make sure the result of your implementation is correct.
   const auto maxDiffOrig = check_result(hOut, dOutOrig);
   const auto maxDiffNew = check_result(hOut, dOutNew);
-  std::cout << "\n" <<  VV(maxDiffOrig) << VV(maxDiffNew);
-  if (maxDiffNew > 1e-4) {
-    return EXIT_FAILURE;
-  }
+  std::cout << "DIFFS:\n" << VV(maxDiffOrig) << VV(maxDiffNew);
 
-  return EXIT_SUCCESS;
+  return (maxDiffNew < 1e-4) ? EXIT_SUCCESS : EXIT_FAILURE;
+
+  // Latest results on a GeForce RTX 3070:
+  // 
+  //    TIMES:
+  //    msOrig: 41276
+  //    msNew : 32494.5
+  //
+  //    DIFFS:
+  //    maxDiffOrig : 6.48499e-05
+  //    maxDiffNew: 5.8651e-05
+  //
+  // => The new version is 1.27x faster with 1.1x higher precision.
 }
