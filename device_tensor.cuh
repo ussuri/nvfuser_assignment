@@ -76,6 +76,10 @@ class device_tensor : public tensor<N_DIMS> {
   void copy(const device_tensor<N_DIMS>&) override;
   void copy(const host_tensor<N_DIMS>&) override;
   void fill_random() override;
+
+  friend std::ostream& operator<<(std::ostream& os, const device_tensor<N_DIMS>& x) {
+    return os << host_tensor<N_DIMS>{x};
+  }
 };
 
 using device_scalar = device_tensor<0>;

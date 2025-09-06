@@ -16,6 +16,8 @@
 #include "ops.cuh"
 #include "utils.cuh"
 
+#define VV(x) #x ": " << (x) << "\n\n"
+
 // Reference CPU implementation
 // Do not change this function, It is the reference implementation for you to
 // match!
@@ -64,45 +66,43 @@ device_tensor<2> op_and_normalize_orig(device_tensor<2>& input) {
   input = pointwise_apply<div_op<>, 2>(input, scale);
   input = pointwise_apply<sinh_op<>, 2>(input);
 
-  device_tensor<1> ave = reduce_apply<add_op<>>(input);
+  auto ave = reduce_apply<add_op<>>(input);
 
   device_tensor<1> n(ave, false);
   fill_apply<1>(n, (float)input.size[1]);
 
   ave = pointwise_apply<div_op<>, 1>(ave, n);
 
-  device_tensor<2> diff = broadcast_apply<sub_op>(input, ave);
-  device_tensor<2> diff_sq = pointwise_apply<square_op<>>(diff);
-
-  device_tensor<1> std_dev_sq = reduce_apply<add_op<>>(diff_sq);
+  auto diff = broadcast_apply<sub_op>(input, ave);
+  auto diff_sq = pointwise_apply<square_op<>>(diff);
+  auto std_dev_sq = reduce_apply<add_op<>>(diff_sq);
   std_dev_sq = pointwise_apply<div_op<>>(std_dev_sq, n);
+
   device_tensor<1> epsilon(std_dev_sq, false);
   fill_apply<1>(epsilon, 1e-14);
-  std_dev_sq = pointwise_apply<add_op<>>(std_dev_sq, epsilon);
 
-  device_tensor<2> inp_m_ave = broadcast_apply<sub_op>(input, ave);
-  device_tensor<1> std_dev = pointwise_apply<square_root_op<>>(std_dev_sq);
+  auto inp_m_ave = broadcast_apply<sub_op>(input, ave);
+
+  std_dev_sq = pointwise_apply<add_op<>>(std_dev_sq, epsilon);
+  auto std_dev = pointwise_apply<square_root_op<>>(std_dev_sq);
 
   return broadcast_apply<div_op<>>(inp_m_ave, std_dev);
 }
 
-device_tensor<2> op_and_normalize_opt(device_tensor<2>& input) {
-  using kScale = std::ratio<19, 10>;
-  using kEpsilon = std::ratio<1, 100>;
+device_tensor<2> op_and_normalize_opt(const device_tensor<2>& input) {
+  using kScale = std::ratio<10, 19>;
+  using kEpsilon = std::ratio<1, 100'000'000'000'000UL>;
+  const size_t n = input.size[1];
 
-  const float n = static_cast<float>(input.size[0]);
-    
-  device_tensor<1> prep_input = reduce_apply<add_op<sinh_op<scale_op<kScale>>>>(input);
-
+  device_tensor<2> sinh_input = pointwise_apply<sinh_op<scale_op<kScale>>>(input);
+  device_tensor<1> prep_input = reduce_apply<add_op<>>(sinh_input);
   device_tensor<1> ave = pointwise_apply<div_op<>>(prep_input, n);
-
-  device_tensor<2> diff_sq = broadcast_apply<square_op<sub_op>>(input, ave);
+  device_tensor<2> diff_sq = broadcast_apply<square_op<sub_op>>(sinh_input, ave);
   device_tensor<1> std_dev_sq = reduce_apply<add_op<>>(diff_sq);
-  std_dev_sq = pointwise_apply<div_op<incr_op<kEpsilon, identity_op>>>(std_dev_sq, n);
-
-  device_tensor<2> inp_m_ave = broadcast_apply<sub_op>(input, ave);
+  std_dev_sq = pointwise_apply<div_op<>>(std_dev_sq, 1.0 * n);
+  std_dev_sq = pointwise_apply<incr_op<kEpsilon>>(std_dev_sq);
+  device_tensor<2> inp_m_ave = broadcast_apply<sub_op>(sinh_input, ave);
   device_tensor<1> std_dev = pointwise_apply<square_root_op<>>(std_dev_sq);
-
   device_tensor<2> res = broadcast_apply<div_op<>>(inp_m_ave, std_dev);
 
   return res;
@@ -127,8 +127,6 @@ float check_result(
 constexpr uint32_t M = 2 * 2;
 constexpr uint32_t N = 2;
 constexpr uint32_t ITERATIONS = 1;
-
-#define VV(x) #x "=" << (x) << " "
 
 int main() {
   /*
@@ -163,20 +161,18 @@ int main() {
   const float msOrig = tOrig.stop();
 
   timer tNew;
+  tNew.start();
   for (int i = 0; i < ITERATIONS; i++) {
     dOutNew = op_and_normalize_opt(dOutNew);
   }
   const float msNew = tNew.stop();
 
   // Print the amount of time required by the gpu implementation.
-  std::cout << "Timing: " << msOrig << " -> " << msNew << " ms" << std::endl;
+  std::cout << VV(msOrig) << VV(msNew) << std::endl;
   #if 1
   const host_tensor<2> dOutOrigCopy{dOutOrig};
   const host_tensor<2> dOutNewCopy{dOutNew};
-    std::cout 
-        << VV(hOut) << std::endl 
-        << VV(dOutOrigCopy) << std::endl 
-        << VV(dOutNewCopy) << std::endl;
+  std::cout << VV(hOut) << VV(dOutOrigCopy) << VV(dOutNewCopy);
   #endif
 
   // Make sure the result of your implementation is correct.

@@ -5,7 +5,7 @@
 #include <ratio>
 
 struct identity_op {
-  __host__ __device__ static inline float op(const float& a) {
+  __host__ __device__ static inline constexpr float op(const float& a) {
     return a;
   }
 };
@@ -18,10 +18,10 @@ struct scale_op {
 };
 
 // NOTE: Take `INCR` by ref b/c pure float template params are non-standard.
-template <typename incr, typename inner_op>
+template <typename incr>
 struct incr_op {
   __host__ __device__ static inline float op(const float& a) {
-    return inner_op::op(a) + (1.0L * incr::num / incr::den);
+    return a + (1.0L * incr::num / incr::den);
   }
 };
 
@@ -52,10 +52,10 @@ struct square_root_op {
   }
 };
 
-template <typename inner_op = identity_op>
+template <typename inner_op_a = identity_op, typename inner_op_b = identity_op>
 struct add_op {
   __host__ __device__ static inline float op(const float& a, const float& b) {
-    return inner_op::op(a) + inner_op::op(b);
+    return inner_op_a::op(a) + inner_op_b::op(b);
   }
 
   // Init value for reduction use of this op
