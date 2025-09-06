@@ -194,12 +194,13 @@ int main() {
   // Repesentative results on a GeForce RTX 3070:
   // 
   //    TIMES:
-  //    msOrig: 41276
-  //    msNew : 29829
+  //    Old code: 1985 ms
+  //    New code + op_and_normalize_orig() (i.e. all supporting changes, but not the main one): 1678 ms
+  //    New code + op_and_normalize_opt() (i.e. everything):  960 ms
   //
   //    DIFFS:
-  //    maxDiffOrig : 6.48499e-05
-  //    maxDiffNew: 5.8651e-05
+  //    Old code: 6.48499e-05
+  //    New code: 5.8651e-05
   //
   // The times are reliably reproducible. The precisions vary a bit between runs
   // due to random initialization of the inputs, but are always at least comparable.
