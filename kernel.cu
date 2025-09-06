@@ -181,7 +181,7 @@ int main() {
   // 
   //    TIMES:
   //    msOrig: 41276
-  //    msNew : 32494.5
+  //    msNew : 29829
   //
   //    DIFFS:
   //    maxDiffOrig : 6.48499e-05
@@ -189,5 +189,5 @@ int main() {
   //
   // The times are reliably reproducible. The precisions vary a bit between runs
   // due to random initialization of the inputs, but are always at least comparable.
-  // So the new version is 1.27x faster with no measurable loss in precision.
+  // So the new version is ~1.4x faster with no measurable loss in precision.
 }
