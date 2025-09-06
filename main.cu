@@ -7,6 +7,7 @@
 
 #include <cuda.h>
 
+#include <future>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include "device_patterns.cuh"
@@ -104,34 +105,35 @@ device_tensor<2> op_and_normalize_opt(const device_tensor<2>& input) {
 
   device_tensor<2> sinh_input = //
       pointwise_apply<sinh_op<scale_op<kScale>>>(input);
+  device_tensor<1> red_sinh_input = //
+      reduce_apply<add_op<>>(sinh_input);
+  device_tensor<1> ave = //
+      pointwise_apply<div_op<>>(std::move(red_sinh_input), n);
 
-  device_tensor<2> inp_m_ave{input.size};
-  device_tensor<1> std_dev{{input.size[0]}};
+  std::future<device_tensor<2>> inp_m_ave = std::async(
+      std::launch::async, //
+      [&]() { //
+        return broadcast_apply<sub_op>(std::move(sinh_input), ave);
+      });
 
-  {
-    device_tensor<1> red_sinh_input = //
-        reduce_apply<add_op<>>(sinh_input);
-    device_tensor<1> ave = //
-        pointwise_apply<div_op<>>(std::move(red_sinh_input), n);
-    inp_m_ave = //
-        broadcast_apply<sub_op>(std::move(sinh_input), ave);
-  }
-
-  {
-    device_tensor<2> diff_sq = //
-        broadcast_apply<square_op<sub_op>>(sinh_input, ave);
-    device_tensor<1> red_diff_sq = //
-        reduce_apply<add_op<>>(std::move(diff_sq));
-    device_tensor<1> div_red_diff_sq = //
-        pointwise_apply<div_op<>>(std::move(red_diff_sq), n);
-    device_tensor<1> std_dev_sq = //
-        pointwise_apply<incr_op<kEpsilon>>(std::move(div_red_diff_sq));
-    std_dev = //
-        pointwise_apply<square_root_op<>>(std::move(std_dev_sq));
-  }
+  std::future<device_tensor<1>> std_dev = std::async(
+      std::launch::async, //
+      [&]() {
+        device_tensor<2> diff_sq = //
+            broadcast_apply<square_op<sub_op>>(sinh_input, ave);
+        device_tensor<1> red_diff_sq = //
+            reduce_apply<add_op<>>(std::move(diff_sq));
+        device_tensor<1> div_red_diff_sq = //
+            pointwise_apply<div_op<>>(std::move(red_diff_sq), n);
+        device_tensor<1> std_dev_sq = //
+            pointwise_apply<incr_op<kEpsilon>>(std::move(div_red_diff_sq));
+        return //
+            pointwise_apply<square_root_op<>>(std::move(std_dev_sq));
+      });
 
   device_tensor<2> res = //
-      broadcast_apply<div_op<>>(std::move(inp_m_ave), std::move(std_dev));
+      broadcast_apply<div_op<>>(
+          std::move(inp_m_ave.get()), std::move(std_dev.get()));
 
   return res;
 }
@@ -211,17 +213,16 @@ int main() {
   //
   // Repesentative runs on a GeForce RTX 3070, release build:
   //
-  //    TIMES:
-  //    Old code: 1985 ms
-  //    New code + op_and_normalize_orig() (i.e. all supporting changes, but not
-  //    the main one): 1678 ms New code + op_and_normalize_opt() (i.e.
-  //    everything):  960 ms
+  // RUNNING TIMES on a GeForce RTX 3070, release build:
+  //   Old code: 1985 ms
+  //   New code + op_and_normalize_orig() (== just supporting changes): 1678 ms
+  //   New code + op_and_normalize_opt() (== everything):  960 ms
   //
-  //    DIFFS:
-  //    Old code: 6.48499e-05
-  //    New code: 5.8651e-05
+  // DIFFS:
+  //   Old code: 6.48499e-05
+  //   New code: 5.8651e-05
   //
-  // The times are reliably reproducible. The precisions vary a bit between runs
-  // due to random initialization of the inputs, but are always at least
-  // comparable.
+  // The running times are reliably reproducible. The diffs vary a bit between
+  // runs due to random initialization of the inputs, but are always at least on
+  // par.
 }
