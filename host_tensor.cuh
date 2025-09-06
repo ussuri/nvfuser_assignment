@@ -68,4 +68,19 @@ class host_tensor : public tensor<N_DIMS> {
   void copy(const host_tensor<N_DIMS>&) override;
   void fill_random() override;
   void fill(float val);
+
+  friend std::ostream& operator<<(std::ostream& os, const host_tensor<N_DIMS>& x) {
+    os << "tensor<";
+    for (int i = 0; i < N_DIMS; ++i) {
+      os << x.size[i] << ((i < N_DIMS - 1) ? "," : "");
+    }
+    os << "> = {";
+    for (size_t i = 0, n = x.get_n_elems(); i < n; ++i) {
+      os << x.at_linear(i);
+      if (i < n - 1)
+        os << ", ";
+    }
+    os << "}";
+    return os;
+  }
 };

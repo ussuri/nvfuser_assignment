@@ -134,19 +134,4 @@ class tensor {
         "dimensions.\n");
     set_n_elems();
   }
-
-  friend std::ostream& operator<<(std::ostream& os, const tensor<N_DIMS>& x) {
-    os << "tensor<";
-    for (int i = 0; i < N_DIMS; ++i) {
-      os << x.size[i] << ((i < N_DIMS - 1) ? "," : "");
-    }
-    os << "> = {";
-    for (int i = 0, n = x.get_n_elems(); i < n; ++i) {
-      os << x.at_linear(i);
-      if (i < n - 1) 
-        os << ", ";
-    }
-    os << "}";
-    return os;
-  }
 };
