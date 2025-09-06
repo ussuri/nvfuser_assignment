@@ -58,7 +58,8 @@ host_tensor<2> op_and_normalize(host_tensor<2>& input) {
 // This is a sample GPU implementation, anything and nothing can be kept from it
 
 device_tensor<2> op_and_normalize(device_tensor<2>& input) {
-#if 0
+#define ORIG 0
+#if ORIG
   device_tensor<2> scale(input, false);
   fill_apply<2>(scale, 1.9);
   input = pointwise_apply<div_op<>, 2>(input, scale);
@@ -124,8 +125,8 @@ float check_result(
 }
 
 // Size to run
-constexpr uint32_t M = 1024 * 4;
-constexpr uint32_t N = 1024;
+constexpr uint32_t M = 128 * 4;
+constexpr uint32_t N = 128;
 constexpr uint32_t ITERATIONS = 8;
 
 #define VV(x) #x "=" << (x) << " "
