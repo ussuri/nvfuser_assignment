@@ -69,25 +69,24 @@ device_tensor<2> op_and_normalize(device_tensor<2>& input) {
   input = pointwise_apply<div_op<>, 2>(input, scale);
   input = pointwise_apply<sinh_op<>, 2>(input);
 
-  auto ave = reduce_apply<add_op<>>(input);
+  device_tensor<1> ave = reduce_apply<add_op<>>(input);
 
   device_tensor<1> n(ave, false);
   fill_apply<1>(n, (float)input.size[1]);
 
   ave = pointwise_apply<div_op<>, 1>(ave, n);
 
-  auto diff = broadcast_apply<sub_op>(input, ave);
-  auto diff_sq = pointwise_apply<square_op<>>(diff);
-  auto std_dev_sq = reduce_apply<add_op<>>(diff_sq);
-  std_dev_sq = pointwise_apply<div_op<>>(std_dev_sq, n);
+  device_tensor<2> diff = broadcast_apply<sub_op>(input, ave);
+  device_tensor<2> diff_sq = pointwise_apply<square_op<>>(diff);
 
+  device_tensor<1> std_dev_sq = reduce_apply<add_op<>>(diff_sq);
+  std_dev_sq = pointwise_apply<div_op<>>(std_dev_sq, n);
   device_tensor<1> epsilon(std_dev_sq, false);
   fill_apply<1>(epsilon, 1e-14);
-
-  auto inp_m_ave = broadcast_apply<sub_op>(input, ave);
-
   std_dev_sq = pointwise_apply<add_op<>>(std_dev_sq, epsilon);
-  auto std_dev = pointwise_apply<square_root_op<>>(std_dev_sq);
+
+  device_tensor<2> inp_m_ave = broadcast_apply<sub_op>(input, ave);
+  device_tensor<1> std_dev = pointwise_apply<square_root_op<>>(std_dev_sq);
 
   return broadcast_apply<div_op<>>(inp_m_ave, std_dev);
 #else
