@@ -17,7 +17,7 @@ __global__ void kernel_fill_apply(device_tensor<N_DIMS> x, const float val) {
 // GPU kernel wrapper for fill_apply.
 template <int N_DIMS>
 void fill_apply(device_tensor<N_DIMS>& x, const float val) {
-  kernel_fill_apply<N_DIMS><<<1, 32>>>(x, val);
+  kernel_fill_apply<N_DIMS><<<1, 32>>>(std::move(x), val);
 }
 
 /*
@@ -40,11 +40,11 @@ __global__ void kernel_pointwise_apply(
 // GPU kernel wrapper for pointwise apply
 template <typename op, int N_DIMS>
 device_tensor<N_DIMS> pointwise_apply(
-    const device_tensor<N_DIMS>& x,
-    const device_tensor<N_DIMS>& y) {
+    device_tensor<N_DIMS> x,
+    device_tensor<N_DIMS> y) {
   assert(x.get_n_elems() == y.get_n_elems());
   device_tensor<N_DIMS> out(x.size);
-  kernel_pointwise_apply<op, N_DIMS><<<1, 32>>>(out, x, y);
+  kernel_pointwise_apply<op, N_DIMS><<<1, 32>>>(out, std::move(x), std::move(y));
   return out;
 }
 
@@ -68,10 +68,10 @@ __global__ void kernel_pointwise_apply(
 // GPU kernel wrapper for pointwise apply
 template <typename op, int N_DIMS>
 device_tensor<N_DIMS> pointwise_apply(
-    const device_tensor<N_DIMS>& x,
+    device_tensor<N_DIMS> x,
     float y) {
   device_tensor<N_DIMS> out(x.size);
-  kernel_pointwise_apply<op, N_DIMS><<<1, 32>>>(out, x, y);
+  kernel_pointwise_apply<op, N_DIMS><<<1, 32>>>(out, std::move(x), std::move(y));
   return out;
 }
 
@@ -93,9 +93,9 @@ __global__ void kernel_pointwise_apply(
 
 // GPU kernel wrapper for pointwise apply
 template <typename op, int N_DIMS>
-device_tensor<N_DIMS> pointwise_apply(const device_tensor<N_DIMS>& x) {
+device_tensor<N_DIMS> pointwise_apply(device_tensor<N_DIMS> x) {
   device_tensor<N_DIMS> out(x.size);
-  kernel_pointwise_apply<op, N_DIMS><<<1, 32>>>(out, x);
+  kernel_pointwise_apply<op, N_DIMS><<<1, 32>>>(out, std::move(x));
   return out;
 }
 
@@ -120,9 +120,9 @@ __global__ void reduce_dim_1(device_tensor<1> out, const device_tensor<2> in) {
 
 // GPU kernel wrapper for reduce_dim_1
 template <typename op>
-device_tensor<1> reduce_apply(const device_tensor<2>& x) {
+device_tensor<1> reduce_apply(device_tensor<2> x) {
   device_tensor<1> out({x.size[0]});
-  reduce_dim_1<op><<<1, 32>>>(out, x);
+  reduce_dim_1<op><<<1, 32>>>(out, std::move(x));
   return out;
 }
 
@@ -163,21 +163,21 @@ __global__ void kernel_broadcast_apply(
 // GPU kernel wrapper for first broadcast kernel
 template <typename op>
 device_tensor<2> broadcast_apply(
-    const device_tensor<2>& x,
-    const device_tensor<1>& y) {
+    device_tensor<2> x,
+    device_tensor<1> y) {
   assert(x.size[0] == y.get_n_elems());
   device_tensor<2> out(x.size);
-  kernel_broadcast_apply<op><<<1, 32>>>(out, x, y);
+  kernel_broadcast_apply<op><<<1, 32>>>(out, std::move(x), std::move(y));
   return out;
 }
 
 // GPU kernel wrapper for second broadcast kernel
 template <typename op>
 device_tensor<2> broadcast_apply(
-    const device_tensor<1>& x,
-    const device_tensor<2>& y) {
+    device_tensor<1> x,
+    device_tensor<2> y) {
   assert(x.get_n_elems() == y.size[0]);
   device_tensor<2> out(y.size);
-  kernel_broadcast_apply<op><<<1, 32>>>(out, x, y);
+  kernel_broadcast_apply<op><<<1, 32>>>(out, std::move(x), std::move(y));
   return out;
 }
